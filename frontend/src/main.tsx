@@ -116,6 +116,7 @@ const time = (s?: string) =>
 function App() {
   const [token, setToken] = useState("");
   const [signedIn, setSignedIn] = useState(false);
+  const [checkingSession, setCheckingSession] = useState(true);
   const [data, setData] = useState<Dashboard | null>(null);
   const [job, setJob] = useState<Job | null>(null);
   const [plan, setPlan] = useState<Plan | null>(null);
@@ -128,16 +129,39 @@ function App() {
   const hasActiveRun = data?.jobs.some((j) => !terminal.has(j.state)) || false;
 
   const api = useCallback(
-    async <T,>(path: string, body?: unknown): Promise<T> => {
+    async <T,>(
+      path: string,
+      body?: unknown,
+      credential?: string,
+    ): Promise<T> => {
       const response = await fetch(`/api${path}`, {
         method: body === undefined ? "GET" : "POST",
         headers: {
-          Authorization: `Bearer ${token}`,
           "Content-Type": "application/json",
+          ...(credential ? { Authorization: `Bearer ${credential}` } : {}),
+          ...(body === undefined ? {} : { "X-CSRF-Protection": "1" }),
         },
+        credentials: "same-origin",
         body: body === undefined ? undefined : JSON.stringify(body),
       });
-      const json = await response.json();
+      const json = await response
+        .json()
+        .catch(() => ({
+          detail:
+            "The service could not complete the request. Please try again.",
+        }));
+      if (
+        response.status === 401 &&
+        path !== "/auth/login" &&
+        path !== "/auth/session"
+      ) {
+        setSignedIn(false);
+        setData(null);
+        setJob(null);
+        setCandidate(null);
+        setPlan(null);
+        setError("Your session has expired. Please sign in again.");
+      }
       if (!response.ok)
         throw new Error(
           typeof json.detail === "string"
@@ -146,12 +170,30 @@ function App() {
         );
       return json;
     },
-    [token],
+    [],
   );
   const refresh = useCallback(
     async () => setData(await api<Dashboard>("/dashboard")),
     [api],
   );
+  useEffect(() => {
+    let active = true;
+    api("/auth/session")
+      .then(() => api<Dashboard>("/dashboard"))
+      .then((d) => {
+        if (active) {
+          setData(d);
+          setSignedIn(true);
+        }
+      })
+      .catch(() => {})
+      .finally(() => {
+        if (active) setCheckingSession(false);
+      });
+    return () => {
+      active = false;
+    };
+  }, [api]);
   const act = async (name: string, fn: () => Promise<void>) => {
     setBusy(name);
     setError("");
@@ -178,6 +220,14 @@ function App() {
     );
     return () => clearInterval(timer);
   }, [signedIn, refresh, api, job?.id, hasActiveRun]);
+
+  if (checkingSession)
+    return (
+      <div className="session-check" role="status">
+        <Loader2 className="spin" size={20} />
+        Checking your session…
+      </div>
+    );
 
   if (!signedIn)
     return (
@@ -208,6 +258,8 @@ function App() {
           onSubmit={(e) => {
             e.preventDefault();
             act("login", async () => {
+              await api("/auth/login", {}, token);
+              setToken("");
               await refresh();
               setSignedIn(true);
             });
@@ -240,7 +292,8 @@ function App() {
             Open workspace
           </button>
           <small>
-            Your token stays in memory and clears when this page closes.
+            Your session lasts up to four hours and stays signed in through
+            refresh.
           </small>
         </form>
       </div>
@@ -277,10 +330,17 @@ function App() {
         </div>
         <button
           className="nav logout"
+          disabled={busy === "logout"}
           onClick={() => {
-            setToken("");
-            setSignedIn(false);
-            setData(null);
+            act("logout", async () => {
+              await api("/auth/logout", {});
+              setToken("");
+              setSignedIn(false);
+              setData(null);
+              setJob(null);
+              setCandidate(null);
+              setPlan(null);
+            });
           }}
         >
           <LogOut size={17} />

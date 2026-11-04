@@ -5,11 +5,12 @@ from contextlib import asynccontextmanager
 from typing import Annotated
 
 import httpx
-from fastapi import Depends, FastAPI, Header, HTTPException, Request
+from fastapi import Depends, FastAPI, Header, HTTPException, Request, Response
 from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
+from .auth import browser_write, create_session, read_session, revoke_session, token_matches
 from .config import Settings
 from .domain import PlanRequest, StartRequest
 from .providers import OSV, Gemini, GitHub, ProviderError, Registry
@@ -41,11 +42,15 @@ def create_app(settings=None, service=None):
 
     app = FastAPI(title="Dependency Steward", lifespan=lifespan, docs_url=None, redoc_url=None)
 
-    def operator(authorization: Annotated[str | None, Header()] = None):
-        if not authorization or not secrets.compare_digest(
-            authorization, f"Bearer {settings.operator_token}"
-        ):
-            raise HTTPException(status_code=401, detail="Sign in with the operator token")
+    def operator(request: Request, authorization: Annotated[str | None, Header()] = None):
+        if authorization is not None:
+            if token_matches(authorization, settings):
+                return
+        elif read_session(request, settings):
+            if request.method not in ("GET", "HEAD", "OPTIONS"):
+                browser_write(request, settings)
+            return
+        raise HTTPException(status_code=401, detail="Sign in with the operator token")
 
     def worker(x_worker_token: Annotated[str | None, Header()] = None):
         if settings.app_role == "worker" and os.environ.get("K_SERVICE"):
@@ -82,6 +87,26 @@ def create_app(settings=None, service=None):
     @app.get("/health")
     def health():
         return {"status": "ok"}
+
+    @app.post("/api/auth/login")
+    def login(request: Request, response: Response, authorization: Annotated[str | None, Header()] = None):
+        browser_write(request, settings)
+        if not token_matches(authorization, settings):
+            raise HTTPException(401, "The operator token is incorrect")
+        # Re-authentication revokes any existing browser session before issuing another one.
+        revoke_session(request, response, settings)
+        expires = create_session(request, response, settings)
+        return {"authenticated": True, "expires_at": expires}
+
+    @app.get("/api/auth/session", dependencies=[Depends(operator)])
+    def session():
+        return {"authenticated": True}
+
+    @app.post("/api/auth/logout")
+    def logout(request: Request, response: Response):
+        browser_write(request, settings)
+        revoke_session(request, response, settings)
+        return {"authenticated": False}
 
     @app.get("/api/dashboard", dependencies=[Depends(operator)])
     def dashboard(svc: Service):

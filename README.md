@@ -87,3 +87,9 @@ These scripts target the existing dedicated assessment project. For another depl
 The root React invitation app intentionally uses older Zod 3.24.2. Its four tests protect the validation contract; a Zod 4 update requires adapting `ZodError.errors` to `issues`. Tests remain unchanged through upgrades. See [fixture notes](docs/FIXTURE.md). The execution helper and workflow are authored under `runner/` and copied to `.steward/` and `.github/workflows/`; keep these copies synchronized.
 
 One public owned repository, one direct npm dependency, one repair attempt. No automatic merges, default-branch pushes, repository-code execution in Cloud Run, test edits, or model-generated shell commands. Passing checks establish configured coverage only. Private customer repositories and stronger hostile-code isolation are production extensions, outside this prototype.
+
+## Sign-in sessions
+
+Signing in exchanges the operator token for an opaque session cookie. The production cookie is Secure, HttpOnly, host-only, and SameSite=Strict. Sessions last four hours by default, survive page refresh and API restarts, and are revoked on sign-out. Expiry and operator-token rotation are enforced on the server. The operator token is cleared from the sign-in form after login and is not saved in localStorage or sessionStorage. Cookie-authenticated writes require an additional request header and same-origin checks; bearer authentication remains available for scripts.
+
+The local development entry point permits the cookie over loopback HTTP. Production keeps `SESSION_COOKIE_SECURE=true`. `SESSION_TTL_SECONDS` controls the absolute session duration (default 14400).

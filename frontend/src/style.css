@@ -1158,3 +1158,12 @@ dd {
 .score-details dd {
   text-align: right;
 }
+.session-check {
+  min-height: 100vh;
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  justify-content: center;
+  color: #55776b;
+  font-size: 14px;
+}

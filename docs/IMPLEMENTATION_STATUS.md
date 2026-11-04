@@ -23,3 +23,7 @@ Record and review the final assessment video with the author's narration. [The w
 ## Prototype limits
 
 One owned public repository, one direct npm dependency per upgrade, one repair attempt, and a single operator token. Cloud orchestration reconciles every five minutes, so stages can have scheduling latency. Passing checks establish the fixture's configured coverage, not universal safety. Private customer repositories, multi-user auth, broader ecosystems, and stronger isolation for hostile repositories are production extensions.
+
+## Persistent sessions
+
+Sign-in now survives refresh for an absolute four-hour session. The server revokes the session on logout and enforces expiry and operator-token rotation. Opaque cookies are Secure/HttpOnly/SameSite=Strict in production, and cookie-authenticated writes have origin/header protections. The deployed sign-in, restore, and logout flow was verified over HTTPS and in a browser.

@@ -43,7 +43,9 @@ class GcloudCredentials(Credentials):
 
 
 def main():
-    settings = Settings(_env_file=ROOT / "backend/.env")
+    settings = Settings(_env_file=ROOT / "backend/.env").model_copy(
+        update={"session_cookie_secure": False}
+    )
     client = httpx.AsyncClient(timeout=60)
     store = (
         FirestoreStore(

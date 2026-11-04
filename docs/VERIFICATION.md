@@ -49,3 +49,9 @@
 The initial compatible workflow and diagnosis were accelerated using explicit verification-harness ticks; the production cadence remains five minutes. Both upgrade tests use real GitHub-hosted execution, npm packages, OSV data, and live Gemini for the repair. Mocked provider responses are used only in the automated policy/state tests.
 
 No PR has been merged and the deliberately old fixture remains on the default branch for reproducible demonstrations. Passing checks establish this fixture's configured coverage only. The video walkthrough still needs to be recorded; its script is in `VIDEO_WALKTHROUGH.md`.
+
+## Persistent sign-in follow-up
+
+Browser authentication now exchanges the operator token for a revocable, opaque four-hour session. The cookie is Secure, HttpOnly, SameSite=Strict and host-only in production; the token is cleared from the form and is not stored in browser storage. Session records retain only a hash of the cookie value and an operator-key fingerprint.
+
+Five session tests cover new API instance/browser-client restoration, expiry, forged cookies, credential rotation, server-side logout, and cross-site write rejection. The standard suite passes 36 tests, with the existing opt-in live Firestore test skipped. A browser sign-in/refresh/logout/refresh check passed. Live HTTPS checks on Cloud Run verified cookie attributes, restored authentication from a fresh client, and rejected reuse of the cookie after logout.

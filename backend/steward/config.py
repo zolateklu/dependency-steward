@@ -25,6 +25,8 @@ class Settings(BaseSettings):
     source_paths: list[str] = ["src/schema.ts"]
     daily_scan_hour_eat: int = Field(default=9, ge=0, le=23)
     app_role: Literal["combined", "web", "worker"] = "combined"
+    session_ttl_seconds: int = Field(default=14400, ge=300, le=86400)
+    session_cookie_secure: bool = True
 
     def require_ready(self):
         if len(self.operator_token) < 24 or len(self.worker_token) < 24:
