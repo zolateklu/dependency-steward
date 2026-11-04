@@ -372,12 +372,20 @@ class Steward:
             rev = self.store.put(f"job-{job_id}", rev, job)
         except Conflict:
             return
+        previous_requests = self.github.requests
+        previous_limit = getattr(self.github, "request_limit", 200)
+        remaining = max(0, 200 - job.get("github_requests", 0))
+        self.github.request_limit = previous_requests + remaining
         try:
             if job["state"] == "cancelled" and job.get("run_id") and not job.get("remote_cancelled"):
                 await self.github.api("POST", f"actions/runs/{job['run_id']}/cancel")
                 job["remote_cancelled"] = True
             if job["state"] not in TERMINAL:
-                await self.advance(job)
+                if remaining == 0:
+                    job["state"] = "blocked"
+                    event(job, "GitHub request budget exhausted; inspect any uncertain external outcome")
+                else:
+                    await self.advance(job)
         except (ValueError, ProviderError, httpx.HTTPError) as exc:
             # Unknown dispatch/publication results are reconciled before any retry.
             if job["state"] in ("publishing",) or job.get("dispatch_intent"):
@@ -387,6 +395,9 @@ class Steward:
                 event(job, str(exc)[:500])
         except Conflict:
             return
+        finally:
+            job["github_requests"] = job.get("github_requests", 0) + self.github.requests - previous_requests
+            self.github.request_limit = previous_limit
         job["lease_until"] = ""
         try:
             rev, latest = self.store.get(f"job-{job_id}")
@@ -513,6 +524,10 @@ class Steward:
                 if result.get("input_hash") != digest(previous_result):
                     raise ValueError("Repair did not use the exact tested candidate")
             if not result.get("candidate", {}).get("passed"):
+                if not result.get("candidate", {}).get("installed"):
+                    raise ValueError(
+                        "Candidate installation failed; a source repair cannot resolve this setup failure"
+                    )
                 if job["attempt"] == 2:
                     raise ValueError("The single source repair did not pass validation")
                 job["candidate_run_id"] = run["id"]

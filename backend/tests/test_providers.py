@@ -15,3 +15,19 @@ async def test_repository_endpoint_has_no_trailing_slash():
     async with httpx.AsyncClient(transport=httpx.MockTransport(handle)) as client:
         await GitHub("fake", "owner/fixture", client).head()
     assert paths == ["/repos/owner/fixture", "/repos/owner/fixture/commits/main"]
+
+
+async def test_conditional_read_reuses_only_validated_etag_response():
+    calls = []
+
+    async def handle(request):
+        calls.append(request.headers.get("if-none-match"))
+        if len(calls) == 1:
+            return httpx.Response(200, json={"value": "original"}, headers={"etag": '"version-1"'})
+        return httpx.Response(304)
+
+    async with httpx.AsyncClient(transport=httpx.MockTransport(handle)) as client:
+        github = GitHub("fake", "owner/fixture", client)
+        assert await github.api("GET", "") == {"value": "original"}
+        assert await github.api("GET", "") == {"value": "original"}
+    assert calls == [None, '"version-1"']

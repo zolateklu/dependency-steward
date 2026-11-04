@@ -67,6 +67,22 @@ def test_lockfile_rejects_workspaces_and_unsupported_versions(plan):
         parse_lock({"lockfileVersion": 1})
 
 
+def test_hoisted_dependency_paths_preserve_production_exposure():
+    lock = {
+        "lockfileVersion": 3,
+        "packages": {
+            "": {"dependencies": {"app-lib": "1.0.0"}, "devDependencies": {"tool": "1.0.0"}},
+            "node_modules/app-lib": {"version": "1.0.0", "dependencies": {"shared": "1.0.0"}},
+            "node_modules/tool": {"version": "1.0.0", "dependencies": {"shared": "1.0.0"}, "dev": True},
+            "node_modules/shared": {"version": "1.0.0"},
+        },
+    }
+    shared = next(p for p in parse_lock(lock) if p["name"] == "shared")
+    assert shared["direct"] is False
+    assert shared["dev"] is False
+    assert set(shared["dependency_paths"]) == {"app-lib → shared", "tool → shared"}
+
+
 def test_cvss_vector_is_parsed_and_missing_severity_is_unknown():
     points, _ = severity({"severity": [{"score": "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:H/I:H/A:H"}]})
     assert points == 39

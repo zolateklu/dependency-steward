@@ -1,69 +1,89 @@
 # Dependency Steward
 
-A dependency upgrade engineer for an operator-owned public React/TypeScript repository: authorize an exact plan, establish a clean baseline, try one dependency update, attempt one bounded source repair if needed, and publish a draft PR only with passing validation evidence.
+A dependency upgrade engineer for an operator-owned public React/TypeScript repository. Authorize an exact plan, establish a clean baseline, try one direct dependency update, attempt one bounded source repair if required, and receive a draft PR only after validation passes.
 
-**Status:** local implementation under verification. Cloud deployment and the live model-assisted repair demonstration are still pending. See [implementation status](docs/IMPLEMENTATION_STATUS.md). Provider mocks in the test suite do not substitute for live execution evidence.
+- **App:** https://dependency-steward-an5pneq45q-uc.a.run.app
+- **Source and reproducible fixture:** https://github.com/zolateklu/dependency-steward
+- **Design:** [solution design](docs/SOLUTION_DESIGN.md)
+- **Observed results:** [live verification](docs/VERIFICATION.md)
+- **Recording guide:** [video walkthrough](docs/VIDEO_WALKTHROUGH.md)
 
-## Project resources
+Sign in with the `OPERATOR_TOKEN` from your local `backend/.env`. Secrets belong only in that ignored local file and GCP Secret Manager; none are bundled in the frontend.
 
-- GCP project: `dependency-steward-zelalem` (separate from existing projects).
-- Owned public fixture: https://github.com/zolateklu/dependency-steward
-- Approved design: [solution design](docs/SOLUTION_DESIGN.md).
+## What it does
+
+The queue uses GitHub, npm, and OSV to show exact installed versions, published targets, advisories, dependency paths, and deterministic priorities. A plan records the repository commit, exact target version, reviewed source files, pinned toolchain, test commands, and authorization to publish a draft PR.
+
+A trusted GitHub Actions workflow runs the baseline and candidate on separate clean VMs. If the candidate introduces a failure, Gemini can propose one bounded source edit. The backend validates the edit paths, hashes, citations, and size, then tests the exact candidate again. Missing evidence, baseline failures, new advisories, stale commits, cancellation, and failed checks block publication.
+
+The dashboard shows progress, install/test/typecheck/build logs, source differences, and PR or blocker results. A private Cloud Run worker continues while the browser is closed. Cloud Scheduler reconciles jobs every five minutes and triggers the daily scan at 09:00 Africa/Addis_Ababa. Slack receives deduplicated notifications. A human reviews and merges.
 
 ## Local setup
 
-Use Python 3.12+, Node 24.6.0, npm 11.8.0, and uv. Run these commands from this directory:
+Requirements: Python 3.12+, Node 24.6.0, npm 11.8.0, uv, and an authenticated gcloud CLI when using Firestore.
+
+From the repository root:
 
 ```sh
-cd backend
-uv sync --group dev --python python3.12
-# A local .env has already been created; do not overwrite it.
-# For a fresh checkout only: cp .env.example .env
+uv sync --project backend --group dev --python python3.12
+npm ci --prefix frontend --ignore-scripts
+npm run build --prefix frontend
 ```
 
-Edit `backend/.env` locally. Set `GITHUB_TOKEN` to a fine-grained PAT for only the demo repository, with Contents, Pull requests, and Actions read/write. Set `GEMINI_API_KEY` for the intended free-tier project and `SLACK_WEBHOOK` for notifications. The operator and worker tokens have already been generated locally. Never commit or share `.env`.
-
-Build the dashboard:
+The local `.env` already exists on the author's machine. For a fresh checkout, copy `backend/.env.example` to `backend/.env`, generate two different tokens with `secrets.token_urlsafe(32)`, and supply the GitHub/Gemini/Slack settings. The GitHub fine-grained token needs only this repository and Contents, Pull requests, and Actions read/write.
 
 ```sh
-cd frontend
-npm ci --ignore-scripts
-npm run build
+backend/.venv/bin/python scripts/dev.py
 ```
 
-Start the API from `backend/`:
+Open http://127.0.0.1:8000. This development entry point refreshes your existing gcloud CLI credentials without changing global application-default credentials or another project's service-account impersonation. Set `FIRESTORE_PROJECT` to your intended project; leave it blank to use SQLite locally.
 
-```sh
-uv run uvicorn steward.app:app --host 127.0.0.1 --port 8000
-```
-
-Open http://127.0.0.1:8000 and use the local `OPERATOR_TOKEN` to sign in. Run the local coordinator from a second terminal in `backend/`:
+For local worker ticks, run this from `backend/` in another terminal:
 
 ```sh
 uv run python -m steward.worker
 ```
 
-The coordinator checks periodically; active upgrade reconciliation is limited to one five-minute tick. SQLite is local development storage only. GCP deployment uses Firestore.
+For frontend development, run `npm run dev --prefix frontend`; Vite proxies API requests to the local backend. SQLite and local filesystems never hold authoritative cloud job state.
 
-## Verify
+## Tests
+
+From the repository root:
 
 ```sh
-# From backend/
-uv run ruff check steward tests
-uv run pytest -q
-
-# From frontend/
-npm run build
-
-# From the repository root
+backend/.venv/bin/ruff check backend/steward backend/tests
+backend/.venv/bin/pytest -q backend/tests
+npm run build --prefix frontend
 npm ci --ignore-scripts
 npm run --ignore-scripts test:ci
 npm run --ignore-scripts typecheck
 npm run --ignore-scripts build
 ```
 
-The demo's deliberately older Zod version provides a real compatibility exercise. Its tests must remain unchanged through upgrades. The GitHub-hosted workflow and helper are authored under `runner/` and copied into the fixture's `.github/workflows/` and `.steward/` directories. Keep the copies synchronized before updating the fixture.
+Policy/state/provider tests include unsafe paths, stale source hashes, oversized repairs, unsafe archives, publication gates, lost-update prevention, idempotent dispatch/publication, cancellation, baseline failure, snooze changes, request budgets, and authenticated API boundaries. Mocked providers exercise failures; [live runs](docs/VERIFICATION.md) separately establish actual execution.
 
-## Boundaries
+## Cloud deployment
 
-One public owned repository, one direct npm dependency per job, one repair attempt. No default-branch pushes, merges, deployments of repository code, test edits, or model-generated shell commands. A passing check covers the configured test profile, not universal upgrade safety. See the design and implementation status for remaining verification and delivery work.
+The dedicated project is `dependency-steward-zelalem`, region `us-central1`. It has Firestore Native, a `steward` Artifact Registry repository, a `steward-runtime` service account, a `steward-build` image builder, and a `steward-scheduler` invoker. Existing projects and the selected gcloud configuration are unchanged.
+
+The runtime has Datastore User and per-secret Secret Accessor permissions. The builder has Artifact Registry Writer, Storage Object Viewer, and Logs Writer. The scheduler has Cloud Run Invoker on the private worker. Cloud Run instances scale to zero and are capped at one per service.
+
+```sh
+# Upload configured local secrets without placing values in command arguments.
+backend/.venv/bin/python scripts/configure_cloud.py
+
+# Build; use the returned build ID after it succeeds.
+gcloud builds submit --config=cloudbuild.yaml \
+  --service-account=projects/dependency-steward-zelalem/serviceAccounts/steward-build@dependency-steward-zelalem.iam.gserviceaccount.com \
+  --project=dependency-steward-zelalem
+
+backend/.venv/bin/python scripts/deploy.py BUILD_ID
+```
+
+These scripts target the existing dedicated assessment project. For another deployment, provision the same resources and update the project/region constants. The public service uses `APP_ROLE=web`; its worker route is disabled. The `APP_ROLE=worker` service requires Cloud Run IAM authentication, with Scheduler OIDC at the edge. Secrets are referenced by name, and Firestore stores plans, state, events, and deduplication keys. The five-minute cadence can add visible stage latency.
+
+## Fixture and scope
+
+The root React invitation app intentionally uses older Zod 3.24.2. Its four tests protect the validation contract; a Zod 4 update requires adapting `ZodError.errors` to `issues`. Tests remain unchanged through upgrades. See [fixture notes](docs/FIXTURE.md). The execution helper and workflow are authored under `runner/` and copied to `.steward/` and `.github/workflows/`; keep these copies synchronized.
+
+One public owned repository, one direct npm dependency, one repair attempt. No automatic merges, default-branch pushes, repository-code execution in Cloud Run, test edits, or model-generated shell commands. Passing checks establish configured coverage only. Private customer repositories and stronger hostile-code isolation are production extensions, outside this prototype.

@@ -1,30 +1,25 @@
-# Implementation status
+# Implementation status · 4 November 2026
 
-Started 4 November 2026 following the recruiter's approval of the upgraded direction.
+## Implemented and deployed
 
-## Provisioned
+- React/TypeScript operator dashboard: sign-in, live ranked queue, exact plan authorization, run timeline, install/test/typecheck/build evidence, unified file differences, source-linked release context, cancellation, acknowledgement, and 1/7/30-day snooze.
+- FastAPI app plus a private Cloud Run worker. The public app disables its worker route. Cloud Run IAM verifies Scheduler OIDC requests.
+- Durable Firestore state, immutable plans, per-repository job reservation, compare-and-set transitions, dispatch intents, bounded repair requests, request budgets, and publication/notification deduplication.
+- Real GitHub, npm, OSV, Gemini, GitHub Actions, and Slack integrations. Runtime secrets are in Secret Manager and are excluded from the repository and frontend.
+- Reviewed GitHub-hosted baseline, upgrade, and repair jobs. Repository scripts run on isolated VMs, never in Cloud Run. Source edits are path/hash/size checked; tests and workflows are protected.
+- The full application and owned root React fixture share https://github.com/zolateklu/dependency-steward. No PR is automatically merged.
+- Separate GCP project `dependency-steward-zelalem`, Firestore in `us-central1`, two Cloud Run services, and a five-minute Scheduler job. Existing projects and the selected gcloud project remain unchanged.
 
-- Separate GCP project: `dependency-steward-zelalem`.
-- The existing open billing account is linked; Run, Firestore, Scheduler, Artifact Registry, Cloud Build, and Secret Manager APIs are enabled.
-- Firestore Native `(default)` database in `us-central1`, with the free tier enabled.
-- Separate public owned fixture: https://github.com/zolateklu/dependency-steward.
-- Existing selected gcloud project has not been changed.
+## Verification
 
-## Local implementation
+See [live verification](VERIFICATION.md) for exact execution links and observed outcomes. Automated tests cover the publication policy and failure states; live provider runs establish actual upgrade behavior. The Firestore concurrency regression also runs against the real service when explicitly enabled.
 
-- React/TypeScript dashboard, token sign-in, queue, plan authorization, run timeline, test reports, before/after file view, cancellation, acknowledgement, and seven-day snooze.
-- FastAPI API; revision-checked SQL and Firestore stores; durable plan/job state and repository lease; authenticated worker tick.
-- Live GitHub, OSV, npm clients; bounded Gemini repair client; Slack deduplication.
-- Immutable version/commit plans; Actions dispatch and reconciliation; baseline/candidate evidence; one repair attempt; publication gates and idempotent draft PR creation.
-- Reviewed GitHub-hosted baseline/upgrade/repair workflow and stdlib execution helper.
-- Public React fixture with four tests and an intentionally older Zod dependency. Zod 4 replaces the application's `errors` interface with `issues`, providing a genuine source compatibility exercise.
+The initial Cloud Run transaction path exposed an expired-transaction error during a scheduled write. It was replaced with server-enforced update-time preconditions; a concurrent-writer check verified that exactly one write succeeds. The corrected version is deployed, with Scheduler resumed.
 
-## Required before final delivery
+## Submission work remaining
 
-- Configure a fine-grained runtime GitHub token scoped to the fixture; Gemini key on the intended free tier; Slack webhook.
-- Verify the live compatible and breaking-upgrade paths, actual artifacts, bounded model repair, PR publication, cancellation, and no-change reconciliation.
-- Deploy the app/private worker, mount secrets, configure IAM and Scheduler, and verify Firestore persistence and notifications.
-- Finish UI accessibility/control details, including 1/7/30-day snooze selection, actual line-diff rendering, release-note evidence, and setup messaging.
-- Record the assessment video and give the user final links and setup instructions.
+Record and review the final assessment video with the author's narration. [The walkthrough script](VIDEO_WALKTHROUGH.md) covers the product, live results, frontend, and backend. A script is not a completed recording. No submission email has been sent.
 
-Local tests and mocked provider runs do not establish that the live upgrade workflow or cloud deployment works. This file records the remaining delivery work explicitly.
+## Prototype limits
+
+One owned public repository, one direct npm dependency per upgrade, one repair attempt, and a single operator token. Cloud orchestration reconciles every five minutes, so stages can have scheduling latency. Passing checks establish the fixture's configured coverage, not universal safety. Private customer repositories, multi-user auth, broader ecosystems, and stronger isolation for hostile repositories are production extensions.

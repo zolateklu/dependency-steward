@@ -54,6 +54,7 @@ type Report = {
   passed: boolean;
   installed: boolean;
   test_count: number;
+  install?: { exit_code: number; duration: number; log: string };
   commands: Record<
     string,
     { exit_code: number; duration: number; log: string }
@@ -124,6 +125,7 @@ function App() {
   const [error, setError] = useState("");
   const [accepted, setAccepted] = useState(false);
   const [tab, setTab] = useState<"overview" | "evidence" | "diff">("overview");
+  const hasActiveRun = data?.jobs.some((j) => !terminal.has(j.state)) || false;
 
   const api = useCallback(
     async <T,>(path: string, body?: unknown): Promise<T> => {
@@ -164,15 +166,18 @@ function App() {
 
   useEffect(() => {
     if (!signedIn) return;
-    const timer = setInterval(() => {
-      refresh().catch(() => {});
-      if (job)
-        api<Job>(`/jobs/${job.id}`)
-          .then(setJob)
-          .catch(() => {});
-    }, 8000);
+    const timer = setInterval(
+      () => {
+        refresh().catch(() => {});
+        if (job)
+          api<Job>(`/jobs/${job.id}`)
+            .then(setJob)
+            .catch(() => {});
+      },
+      hasActiveRun ? 10000 : 60000,
+    );
     return () => clearInterval(timer);
-  }, [signedIn, refresh, api, job?.id]);
+  }, [signedIn, refresh, api, job?.id, hasActiveRun]);
 
   if (!signedIn)
     return (
@@ -424,6 +429,24 @@ function App() {
                               <small>/100</small>
                             </span>
                             <small>{c.severity}</small>
+                            <details className="score-details">
+                              <summary>Why this score?</summary>
+                              <dl>
+                                {Object.entries(c.score_parts).map(
+                                  ([key, value]) => (
+                                    <React.Fragment key={key}>
+                                      <dt>{label(key)}</dt>
+                                      <dd>+{value}</dd>
+                                    </React.Fragment>
+                                  ),
+                                )}
+                              </dl>
+                              <small>
+                                {c.complete
+                                  ? "Current advisory data complete"
+                                  : "Incomplete evidence; investigate"}
+                              </small>
+                            </details>
                           </td>
                           <td>
                             {c.advisory_ids.length ? (
@@ -699,21 +722,24 @@ function App() {
                         <p>
                           {job.result![stage]?.test_count || 0} tests recorded
                         </p>
-                        {Object.entries(job.result![stage]?.commands || {}).map(
-                          ([name, result]) => (
-                            <details key={name}>
-                              <summary>
-                                <Terminal size={14} />
-                                {name}
-                                <span>
-                                  Exit {result.exit_code} ·{" "}
-                                  {result.duration.toFixed(1)}s
-                                </span>
-                              </summary>
-                              <pre>{result.log || "No output"}</pre>
-                            </details>
-                          ),
-                        )}
+                        {Object.entries({
+                          ...(job.result![stage]?.install
+                            ? { "npm ci": job.result![stage].install! }
+                            : {}),
+                          ...(job.result![stage]?.commands || {}),
+                        }).map(([name, result]) => (
+                          <details key={name}>
+                            <summary>
+                              <Terminal size={14} />
+                              {name}
+                              <span>
+                                Exit {result.exit_code} ·{" "}
+                                {result.duration.toFixed(1)}s
+                              </span>
+                            </summary>
+                            <pre>{result.log || "No output"}</pre>
+                          </details>
+                        ))}
                       </div>
                     ))}
                   </div>

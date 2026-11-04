@@ -70,19 +70,23 @@ class FirestoreStore:
         return (data["revision"], data["body"]) if data else (0, None)
 
     def put(self, key, revision, body):
-        from google.cloud import firestore
+        from google.api_core.exceptions import Conflict as CloudConflict
+        from google.api_core.exceptions import FailedPrecondition, NotFound
 
         ref = self.collection.document(key)
-
-        @firestore.transactional
-        def write(transaction):
-            snap = ref.get(transaction=transaction)
-            current = snap.to_dict()["revision"] if snap.exists else 0
-            if current != revision:
-                raise Conflict("State changed; refresh before retrying")
-            transaction.set(ref, {"revision": revision + 1, "body": copy.deepcopy(body)})
-
-        write(self.client.transaction())
+        snap = ref.get()
+        current = snap.to_dict()["revision"] if snap.exists else 0
+        if current != revision:
+            raise Conflict("State changed; refresh before retrying")
+        data = {"revision": revision + 1, "body": copy.deepcopy(body)}
+        try:
+            if not snap.exists:
+                ref.create(data)
+            else:
+                # The server atomically rejects a write if another caller changed this snapshot.
+                ref.update(data, option=self.client.write_option(last_update_time=snap.update_time))
+        except (CloudConflict, FailedPrecondition, NotFound) as exc:
+            raise Conflict("State changed; refresh before retrying") from exc
         return revision + 1
 
     def list(self, prefix):

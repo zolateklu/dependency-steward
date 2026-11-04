@@ -62,6 +62,16 @@ async def test_cancel_prevents_publication(service, plan, result):
     assert not service.github.dispatched
 
 
+async def test_persisted_request_budget_stops_a_job_without_dispatch(service, plan):
+    job = await authorized(service, plan)
+    rev, job = service.store.get(f"job-{job['id']}")
+    job["github_requests"] = 200
+    service.store.put(f"job-{job['id']}", rev, job)
+    await service.reconcile(job["id"], force=True)
+    assert service.store.get(f"job-{job['id']}")[1]["state"] == "blocked"
+    assert service.github.dispatched == []
+
+
 async def test_cancel_boundary_is_explicit(service, plan, result):
     job = await authorized(service, plan)
     rev, job = service.store.get(f"job-{job['id']}")
@@ -112,3 +122,10 @@ def test_api_requires_auth_for_evidence_and_writes(service):
         response = client.get("/api/dashboard", headers=headers)
         assert response.status_code == 200
         assert "not-a-real-token" not in response.text
+
+
+def test_public_web_deployment_never_exposes_worker_route(service):
+    settings = service.settings.model_copy(update={"app_role": "web"})
+    with TestClient(create_app(settings, service)) as client:
+        response = client.post("/internal/tick", headers={"X-Worker-Token": settings.worker_token})
+        assert response.status_code == 404

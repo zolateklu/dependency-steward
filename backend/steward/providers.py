@@ -3,6 +3,7 @@ import io
 import json
 import re
 import stat
+import time
 import zipfile
 from urllib.parse import quote
 
@@ -22,29 +23,42 @@ class GitHub:
         self.repo, self.token = repo, token
         self.client = client or httpx.AsyncClient(timeout=30)
         self.requests = 0
+        self.request_limit = 200
+        self.cache = {}
 
     async def api(self, method, path, **kwargs):
         if not self.repo or not self.token:
             raise ProviderError("Configure GITHUB_REPO and GITHUB_TOKEN on the server")
         self.requests += 1
-        if self.requests > 200:
+        if self.requests > self.request_limit:
             raise ProviderError("GitHub request budget exhausted; work is deferred")
         headers = {
             "Authorization": f"Bearer {self.token}",
             "Accept": "application/vnd.github+json",
             "X-GitHub-Api-Version": "2022-11-28",
         }
+        cache_key = path + json.dumps(kwargs.get("params", {}), sort_keys=True)
+        cached = self.cache.get(cache_key) if method == "GET" else None
+        if cached:
+            headers["If-None-Match"] = cached[0]
         response = await self.client.request(
             method,
             f"https://api.github.com/repos/{self.repo}" + (f"/{path}" if path else ""),
             headers=headers,
             **kwargs,
         )
+        if response.status_code == 304 and cached:
+            return cached[1]
         if response.status_code not in (200, 201, 202, 204):
             raise ProviderError(
                 f"GitHub {method} failed ({response.status_code}); check access or rate limits"
             )
-        return response.json() if response.content else None
+        data = response.json() if response.content else None
+        if method == "GET" and response.headers.get("etag"):
+            if len(self.cache) >= 64:
+                self.cache.pop(next(iter(self.cache)))
+            self.cache[cache_key] = (response.headers["etag"], data)
+        return data
 
     async def head(self):
         info = await self.api("GET", "")
@@ -173,19 +187,27 @@ def decode_artifact(raw):
 class Registry:
     def __init__(self, client=None):
         self.client = client or httpx.AsyncClient(timeout=30)
+        self.cache = {}
 
     async def metadata(self, package):
+        cached = self.cache.get(package)
+        if cached and cached[0] > time.monotonic():
+            return cached[1]
         response = await self.client.get(f"https://registry.npmjs.org/{quote(package, safe='')}")
         if response.status_code != 200:
             raise ProviderError(f"npm metadata unavailable ({response.status_code})")
         data = response.json()
-        return {
+        metadata = {
             "latest": data.get("dist-tags", {}).get("latest"),
             "versions": data.get("versions", {}),
             "time": data.get("time", {}),
             "repository": data.get("repository"),
             "url": f"https://www.npmjs.com/package/{package}",
         }
+        if len(self.cache) >= 32:
+            self.cache.pop(next(iter(self.cache)))
+        self.cache[package] = (time.monotonic() + 86400, metadata)
+        return metadata
 
     async def release_context(self, metadata, target):
         repository = metadata.get("repository")
