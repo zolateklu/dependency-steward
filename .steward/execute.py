@@ -33,7 +33,7 @@ def run(args, cwd, timeout=180):
     except subprocess.TimeoutExpired as exc:
         code, output = 124, (exc.stdout or b"") + (exc.stderr or b"") + b"\nCommand timed out."
     return {"exit_code": code, "duration": round(time.monotonic() - started, 3),
-            "log": output[-160000:].decode(errors="replace")}
+            "log": output[-60000:].decode(errors="replace")}
 
 
 def checks(root):
@@ -147,7 +147,7 @@ def main():
     output = Path(args.output)
     output.parent.mkdir(parents=True, exist_ok=True)
     raw = json.dumps(result, indent=2)
-    if len(raw.encode()) > 900000:
+    if len(raw.encode()) > 650000:
         raise ValueError("Evidence exceeds its storage limit")
     output.write_text(raw)
 

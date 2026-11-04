@@ -1,0 +1,33 @@
+name: Application checks
+on:
+  push:
+    paths:
+      ["backend/**", "frontend/**", "runner/**", ".github/workflows/app-ci.yml"]
+  pull_request:
+    paths:
+      ["backend/**", "frontend/**", "runner/**", ".github/workflows/app-ci.yml"]
+permissions:
+  contents: read
+jobs:
+  backend:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+      - run: python3 -m pip install uv
+      - run: uv sync --group dev --python 3.12
+        working-directory: backend
+      - run: uv run ruff check steward tests && uv run pytest -q
+        working-directory: backend
+  frontend:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: "24.6.0"
+      - run: npm ci --ignore-scripts && npm run build
+        working-directory: frontend

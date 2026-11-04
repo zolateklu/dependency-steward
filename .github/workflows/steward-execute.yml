@@ -1,5 +1,5 @@
 name: Dependency Steward execution
-run-name: 'steward:${{ inputs.job_id }}:${{ inputs.attempt }}'
+run-name: "steward:${{ inputs.job_id }}:${{ inputs.attempt }}"
 on:
   workflow_dispatch:
     inputs:
@@ -19,7 +19,7 @@ permissions:
   contents: read
   actions: read
 concurrency:
-  group: 'steward-${{ inputs.job_id }}-${{ inputs.attempt }}'
+  group: "steward-${{ inputs.job_id }}-${{ inputs.attempt }}"
   cancel-in-progress: false
 env:
   JOB_ID: ${{ inputs.job_id }}
@@ -54,14 +54,14 @@ jobs:
           persist-credentials: false
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
         with:
-          node-version: '24.6.0'
+          node-version: "24.6.0"
       - run: npm install --global npm@11.8.0 --ignore-scripts --no-audit --no-fund
       - id: execute
         run: python3 control/.steward/execute.py baseline
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         if: always()
         with:
-          name: 'steward-${{ inputs.job_id }}-1'
+          name: "steward-${{ inputs.job_id }}-1"
           path: output/evidence.json
           if-no-files-found: error
           retention-days: 7
@@ -90,17 +90,17 @@ jobs:
           persist-credentials: false
       - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
         with:
-          name: 'steward-${{ inputs.job_id }}-1'
+          name: "steward-${{ inputs.job_id }}-1"
           path: input
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
         with:
-          node-version: '24.6.0'
+          node-version: "24.6.0"
       - run: npm install --global npm@11.8.0 --ignore-scripts --no-audit --no-fund
       - run: python3 control/.steward/execute.py upgrade
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         if: always()
         with:
-          name: 'steward-${{ inputs.job_id }}-1'
+          name: "steward-${{ inputs.job_id }}-1"
           path: output/evidence.json
           if-no-files-found: error
           overwrite: true
@@ -132,19 +132,19 @@ jobs:
           persist-credentials: false
       - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
         with:
-          name: 'steward-${{ inputs.job_id }}-1'
+          name: "steward-${{ inputs.job_id }}-1"
           path: input
           run-id: ${{ steps.plan.outputs.run_id }}
           github-token: ${{ github.token }}
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
         with:
-          node-version: '24.6.0'
+          node-version: "24.6.0"
       - run: npm install --global npm@11.8.0 --ignore-scripts --no-audit --no-fund
       - run: python3 control/.steward/execute.py repair
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         if: always()
         with:
-          name: 'steward-${{ inputs.job_id }}-2'
+          name: "steward-${{ inputs.job_id }}-2"
           path: output/evidence.json
           if-no-files-found: error
           retention-days: 7

@@ -1,0 +1,77 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1300" height="1000" viewBox="0 0 1300 1000">
+<defs><marker id="arrow" markerWidth="10" markerHeight="10" refX="8" refY="5" orient="auto"><path d="M1 1 L9 5 L1 9" fill="none" stroke="#47657a" stroke-width="1.7"/></marker></defs>
+<style>.title{font:700 27px Arial,sans-serif;fill:#203244}.label{font:700 21px Arial,sans-serif;fill:#203244}.small{font:16px Arial,sans-serif;fill:#526774}.edge{font:15px Arial,sans-serif;fill:#526774}.line{fill:none;stroke:#47657a;stroke-width:2.5;marker-end:url(#arrow)}.repair{fill:none;stroke:#b77c39;stroke-width:2.5;stroke-dasharray:8 5;marker-end:url(#arrow)}</style>
+<rect width="1300" height="1000" fill="#f7fafb" rx="18"/>
+<text x="45" y="48" class="title">Dependency Steward: implement an upgrade, deliver the evidence</text>
+
+<rect x="50" y="110" width="280" height="110" rx="13" fill="#eaf3f6" stroke="#5b91a5" stroke-width="2"/>
+<text x="190.0" y="142" text-anchor="middle" class="label">Engineer + React UI</text>
+<text x="190.0" y="168" text-anchor="middle" class="small">review plan, authorize, cancel</text>
+<text x="190.0" y="190" text-anchor="middle" class="small">inspect logs, diff, and result</text>
+<rect x="480" y="110" width="300" height="110" rx="13" fill="#eaf3f6" stroke="#5b91a5" stroke-width="2"/>
+<text x="630.0" y="142" text-anchor="middle" class="label">FastAPI application</text>
+<text x="630.0" y="168" text-anchor="middle" class="small">operator authentication</text>
+<text x="630.0" y="190" text-anchor="middle" class="small">plans, jobs, evidence endpoints</text>
+<rect x="920" y="110" width="280" height="110" rx="13" fill="#fff" stroke="#7992a0" stroke-width="2"/>
+<text x="1060.0" y="142" text-anchor="middle" class="label">Firestore</text>
+<text x="1060.0" y="168" text-anchor="middle" class="small">plans, job events, leases</text>
+<text x="1060.0" y="190" text-anchor="middle" class="small">hashes, PRs, deduplication</text>
+<path d="M330 165 H473" class="line"/>
+<text x="405" y="150" text-anchor="middle" class="edge">operator token</text>
+<path d="M780 165 H913" class="line"/>
+<path d="M630 220 V308" class="line"/>
+<text x="714" y="268" text-anchor="middle" class="edge">service identity</text>
+<rect x="50" y="315" width="280" height="110" rx="13" fill="#eaf3f6" stroke="#5b91a5" stroke-width="2"/>
+<text x="190.0" y="347" text-anchor="middle" class="label">Scheduled tick</text>
+<text x="190.0" y="373" text-anchor="middle" class="small">Cloud Scheduler + OIDC</text>
+<text x="190.0" y="395" text-anchor="middle" class="small">Actions cron fallback</text>
+<rect x="480" y="315" width="300" height="110" rx="13" fill="#e4f1f5" stroke="#4b92ad" stroke-width="2"/>
+<text x="630.0" y="347" text-anchor="middle" class="label">Private orchestrator</text>
+<text x="630.0" y="373" text-anchor="middle" class="small">scan, dispatch, reconcile</text>
+<text x="630.0" y="395" text-anchor="middle" class="small">persist state; never execute code</text>
+<rect x="920" y="315" width="280" height="110" rx="13" fill="#fff" stroke="#7992a0" stroke-width="2"/>
+<text x="1060.0" y="347" text-anchor="middle" class="label">Evidence APIs</text>
+<text x="1060.0" y="373" text-anchor="middle" class="small">GitHub, OSV, npm</text>
+<text x="1060.0" y="395" text-anchor="middle" class="small">source, advisories, versions</text>
+<path d="M330 370 H473" class="line"/>
+<path d="M780 370 H913" class="line"/>
+<path d="M1060 220 V265 H830 V334 H787" class="line"/>
+<rect x="50" y="550" width="330" height="142" rx="13" fill="#eaf3f6" stroke="#5b91a5" stroke-width="2"/>
+<text x="215.0" y="582" text-anchor="middle" class="label">GitHub Actions VMs</text>
+<text x="215.0" y="608" text-anchor="middle" class="small">clean baseline -&gt; upgrade</text>
+<text x="215.0" y="630" text-anchor="middle" class="small">optional repair in a new run</text>
+<text x="215.0" y="652" text-anchor="middle" class="small">no backend application secrets</text>
+<rect x="480" y="550" width="300" height="142" rx="13" fill="#fff0dd" stroke="#bd924f" stroke-width="2"/>
+<text x="630.0" y="582" text-anchor="middle" class="label">Validate evidence</text>
+<text x="630.0" y="608" text-anchor="middle" class="small">checks, files, hashes, base SHA</text>
+<text x="630.0" y="630" text-anchor="middle" class="small">missing / failed -&gt; blocker</text>
+<text x="630.0" y="652" text-anchor="middle" class="small">cancel gate before publication</text>
+<rect x="920" y="550" width="280" height="142" rx="13" fill="#e9f2ed" stroke="#66907a" stroke-width="2"/>
+<text x="1060.0" y="582" text-anchor="middle" class="label">Draft PR publisher</text>
+<text x="1060.0" y="608" text-anchor="middle" class="small">job-specific branch + commit</text>
+<text x="1060.0" y="630" text-anchor="middle" class="small">tested diff + reports + sources</text>
+<text x="1060.0" y="652" text-anchor="middle" class="small">engineer reviews and merges</text>
+<path d="M550 425 V490 H215 V543" class="line"/>
+<text x="320" y="479" text-anchor="middle" class="edge">dispatch fixed workflow</text>
+<path d="M380 620 H473" class="line"/>
+<text x="430" y="606" text-anchor="middle" class="edge">artifacts</text>
+<path d="M780 620 H913" class="line"/>
+<text x="850" y="606" text-anchor="middle" class="edge">gates pass</text>
+<path d="M630 550 V432" class="line"/>
+<text x="716" y="493" text-anchor="middle" class="edge">reconcile results</text>
+<rect x="480" y="820" width="300" height="95" rx="13" fill="#fff0dd" stroke="#bd924f" stroke-width="2"/>
+<text x="630.0" y="852" text-anchor="middle" class="label">Gemini</text>
+<text x="630.0" y="878" text-anchor="middle" class="small">diagnosis + one source repair</text>
+<text x="630.0" y="900" text-anchor="middle" class="small">schema, path, and hash checks</text>
+<rect x="920" y="820" width="280" height="95" rx="13" fill="#fff0dd" stroke="#bd924f" stroke-width="2"/>
+<text x="1060.0" y="852" text-anchor="middle" class="label">Slack notification</text>
+<text x="1060.0" y="878" text-anchor="middle" class="small">draft PR or blocker report</text>
+<text x="1060.0" y="900" text-anchor="middle" class="small">one event per completed job</text>
+<path d="M630 692 V813" class="line"/>
+<text x="718" y="760" text-anchor="middle" class="edge">new regression</text>
+<path d="M480 866 H420 V750 H215 V699" class="repair"/>
+<text x="314" y="785" text-anchor="middle" class="edge">one bounded repair</text>
+<path d="M1060 692 V813" class="line"/>
+<path d="M780 665 H865 V866 H913" class="line"/>
+<text x="650" y="960" text-anchor="middle" class="edge">One owned public React/TypeScript repo. One direct dependency. One repair attempt. Human merge.</text>
+</svg>
