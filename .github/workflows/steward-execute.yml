@@ -1,0 +1,150 @@
+name: Dependency Steward execution
+run-name: 'steward:${{ inputs.job_id }}:${{ inputs.attempt }}'
+on:
+  workflow_dispatch:
+    inputs:
+      job_id:
+        required: true
+        type: string
+      attempt:
+        required: true
+        type: string
+      plan_b64:
+        required: true
+        type: string
+      repair_b64:
+        required: false
+        type: string
+permissions:
+  contents: read
+  actions: read
+concurrency:
+  group: 'steward-${{ inputs.job_id }}-${{ inputs.attempt }}'
+  cancel-in-progress: false
+env:
+  JOB_ID: ${{ inputs.job_id }}
+  ATTEMPT: ${{ inputs.attempt }}
+  PLAN_B64: ${{ inputs.plan_b64 }}
+  REPAIR_B64: ${{ inputs.repair_b64 }}
+jobs:
+  baseline:
+    if: inputs.attempt == '1'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    outputs:
+      passed: ${{ steps.execute.outputs.passed }}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          path: control
+          persist-credentials: false
+      - name: Decode and validate authorized base
+        id: plan
+        run: |
+          python3 - <<'PY'
+          import base64,json,os,re
+          p=json.loads(base64.b64decode(os.environ['PLAN_B64']))
+          if not re.fullmatch('[a-f0-9]{40}',p['base_sha']): raise ValueError('Invalid base')
+          with open(os.environ['GITHUB_OUTPUT'],'a') as f: f.write('base='+p['base_sha']+'\n')
+          PY
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: ${{ steps.plan.outputs.base }}
+          path: work
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: '24.6.0'
+      - run: npm install --global npm@11.8.0 --ignore-scripts --no-audit --no-fund
+      - id: execute
+        run: python3 control/.steward/execute.py baseline
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        if: always()
+        with:
+          name: 'steward-${{ inputs.job_id }}-1'
+          path: output/evidence.json
+          if-no-files-found: error
+          retention-days: 7
+  upgrade:
+    needs: baseline
+    if: inputs.attempt == '1' && needs.baseline.outputs.passed == 'true'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          path: control
+          persist-credentials: false
+      - id: plan
+        run: |
+          python3 - <<'PY'
+          import base64,json,os,re
+          p=json.loads(base64.b64decode(os.environ['PLAN_B64']))
+          if not re.fullmatch('[a-f0-9]{40}',p['base_sha']): raise ValueError('Invalid base')
+          with open(os.environ['GITHUB_OUTPUT'],'a') as f: f.write('base='+p['base_sha']+'\n')
+          PY
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: ${{ steps.plan.outputs.base }}
+          path: work
+          persist-credentials: false
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with:
+          name: 'steward-${{ inputs.job_id }}-1'
+          path: input
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: '24.6.0'
+      - run: npm install --global npm@11.8.0 --ignore-scripts --no-audit --no-fund
+      - run: python3 control/.steward/execute.py upgrade
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        if: always()
+        with:
+          name: 'steward-${{ inputs.job_id }}-1'
+          path: output/evidence.json
+          if-no-files-found: error
+          overwrite: true
+          retention-days: 7
+  repair:
+    if: inputs.attempt == '2'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          path: control
+          persist-credentials: false
+      - id: plan
+        run: |
+          python3 - <<'PY'
+          import base64,json,os,re
+          p=json.loads(base64.b64decode(os.environ['PLAN_B64']))
+          r=json.loads(base64.b64decode(os.environ['REPAIR_B64']))
+          if not re.fullmatch('[a-f0-9]{40}',p['base_sha']) or not isinstance(r['run_id'],int): raise ValueError('Invalid repair')
+          with open(os.environ['GITHUB_OUTPUT'],'a') as f:
+            f.write('base='+p['base_sha']+'\n')
+            f.write('run_id='+str(r['run_id'])+'\n')
+          PY
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: ${{ steps.plan.outputs.base }}
+          path: work
+          persist-credentials: false
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with:
+          name: 'steward-${{ inputs.job_id }}-1'
+          path: input
+          run-id: ${{ steps.plan.outputs.run_id }}
+          github-token: ${{ github.token }}
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: '24.6.0'
+      - run: npm install --global npm@11.8.0 --ignore-scripts --no-audit --no-fund
+      - run: python3 control/.steward/execute.py repair
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        if: always()
+        with:
+          name: 'steward-${{ inputs.job_id }}-2'
+          path: output/evidence.json
+          if-no-files-found: error
+          retention-days: 7
