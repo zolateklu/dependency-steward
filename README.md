@@ -2,11 +2,10 @@
 
 A dependency upgrade engineer for an operator-owned public React/TypeScript repository. Authorize an exact plan, establish a clean baseline, try one direct dependency update, attempt one bounded source repair if required, and receive a draft PR only after validation passes.
 
-- **App:** https://dependency-steward-an5pneq45q-uc.a.run.app
 - **Source and reproducible fixture:** https://github.com/zolateklu/dependency-steward
 - **Design:** [solution design](docs/SOLUTION_DESIGN.md)
 - **Observed results:** [live verification](docs/VERIFICATION.md)
-- **Recording guide:** [video walkthrough](docs/VIDEO_WALKTHROUGH.md)
+- **Recording guide:** [assessment walkthrough](docs/VIDEO_WALKTHROUGH.md)
 
 Sign in with the `OPERATOR_TOKEN` from your local `backend/.env`. Secrets belong only in that ignored local file and GCP Secret Manager; none are bundled in the frontend.
 
